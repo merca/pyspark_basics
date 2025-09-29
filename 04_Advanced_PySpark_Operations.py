@@ -724,10 +724,16 @@ final_analysis = complex_analysis.withColumn(
 # Apply UDF for custom scoring
 def calculate_employee_score(salary, revenue, rating, tenure_years):
     """Calculate comprehensive employee score"""
-    revenue_score = min(revenue / 1000, 10)  # Max 10 points
-    salary_efficiency = min(revenue / salary * 10 if salary > 0 else 0, 5)  # Max 5 points  
-    rating_score = (rating or 0) # Direct rating
-    tenure_bonus = min(tenure_years * 0.5, 2)  # Max 2 points for tenure
+    # Handle None values and use Python's built-in min function correctly
+    revenue = revenue or 0
+    salary = salary or 1  # Avoid division by zero
+    rating = rating or 0
+    tenure_years = tenure_years or 0
+    
+    revenue_score = min(revenue / 1000.0, 10.0)  # Max 10 points
+    salary_efficiency = min(revenue / salary * 10.0, 5.0)  # Max 5 points  
+    rating_score = rating  # Direct rating
+    tenure_bonus = min(tenure_years * 0.5, 2.0)  # Max 2 points for tenure
     
     return float(revenue_score + salary_efficiency + rating_score + tenure_bonus)
 
