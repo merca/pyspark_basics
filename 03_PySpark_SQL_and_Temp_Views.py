@@ -187,8 +187,9 @@ all_employees_sales.show()
 
 # COMMAND ----------
 
-# CTE example - multi-step analysis
+# CTE example - multi-step analysis  
 print("=== Complex analysis with CTE ===")
+# Note: Using try_divide() to handle division by zero safely
 complex_analysis = spark.sql("""
     WITH employee_performance AS (
         SELECT 
@@ -225,13 +226,69 @@ complex_analysis = spark.sql("""
         ep.total_sales,
         ep.performance_tier,
         ds.dept_total_sales,
-        ROUND(ep.total_sales / ds.dept_total_sales * 100, 2) as pct_of_dept_sales
+        ROUND(try_divide(ep.total_sales * 100, ds.dept_total_sales), 2) as pct_of_dept_sales
     FROM employee_performance ep
     JOIN department_summary ds ON ep.department = ds.department
     ORDER BY ep.department, ep.total_sales DESC
 """)
 
 complex_analysis.show()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Handling Division by Zero in SQL
+# MAGIC 
+# MAGIC **Important**: When dividing values that might be zero, use `try_divide()` or CASE statements to avoid errors.
+
+# COMMAND ----------
+
+# Alternative approaches to handle division by zero
+print("=== Division by Zero Handling Examples ===")
+
+# Method 1: try_divide() function (recommended)
+print("Method 1: Using try_divide()")
+method1 = spark.sql("""
+    SELECT 
+        department,
+        SUM(total_sales) as dept_sales,
+        COUNT(*) as emp_count,
+        -- try_divide returns NULL if divisor is 0
+        try_divide(SUM(total_sales), COUNT(*)) as avg_sales_per_employee
+    FROM (
+        SELECT 
+            e.department,
+            COALESCE(SUM(s.amount), 0) as total_sales
+        FROM employees e
+        LEFT JOIN sales s ON e.employee_id = s.employee_id
+        GROUP BY e.employee_id, e.department
+    )
+    GROUP BY department
+""")
+method1.show()
+
+# Method 2: CASE WHEN approach
+print("Method 2: Using CASE WHEN")
+method2 = spark.sql("""
+    SELECT 
+        department,
+        SUM(total_sales) as dept_sales,
+        COUNT(*) as emp_count,
+        CASE 
+            WHEN COUNT(*) = 0 THEN NULL
+            ELSE SUM(total_sales) / COUNT(*)
+        END as avg_sales_per_employee
+    FROM (
+        SELECT 
+            e.department,
+            COALESCE(SUM(s.amount), 0) as total_sales
+        FROM employees e
+        LEFT JOIN sales s ON e.employee_id = s.employee_id
+        GROUP BY e.employee_id, e.department
+    )
+    GROUP BY department
+""")
+method2.show()
 
 # COMMAND ----------
 
