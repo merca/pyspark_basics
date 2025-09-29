@@ -423,13 +423,25 @@ except Exception as e:
     print("✅ Running on Serverless compute - RDD operations not supported")
     print("   ➡️ Use DataFrame operations and SQL for optimal performance")
 
-# Caching works on both Classic and Serverless
-employees_df.cache()
-print("\n✅ Employees DataFrame cached (works on both Classic and Serverless)")
-
-# Force the cache by triggering an action
-count = employees_df.count()
-print(f"Cached DataFrame count: {count}")
+# Caching operations (different support on Classic vs Serverless)
+print("\n=== Caching Performance Test ===")
+try:
+    # This works on Classic compute but may have limitations on Serverless
+    employees_df.cache()
+    print("✅ Employees DataFrame cached (Classic compute)")
+    
+    # Force the cache by triggering an action
+    count = employees_df.count()
+    print(f"Cached DataFrame count: {count}")
+    
+except Exception as e:
+    print(f"❌ Caching operation failed: {type(e).__name__}")
+    print("✅ This is expected on some serverless configurations")
+    print("   ➡️ Serverless automatically manages memory optimization")
+    
+    # Get count without explicit caching
+    count = employees_df.count()
+    print(f"DataFrame count (no explicit cache): {count}")
 
 # Alternative ways to check DataFrame structure (serverless-compatible)
 print(f"\nDataFrame schema columns: {len(employees_df.columns)}")

@@ -539,17 +539,32 @@ nested_analysis.show()
 
 # COMMAND ----------
 
-# Caching strategies
+# Caching strategies (Classic vs Serverless compatibility)
 print("=== Performance Optimization ===")
 
-# Cache frequently accessed DataFrames
-employees_df.cache()
-sales_df.cache()
+# Caching is NOT SUPPORTED on serverless compute
+try:
+    # Cache frequently accessed DataFrames (Classic compute)
+    employees_df.cache()
+    sales_df.cache()
+    print("✅ DataFrames cached (Classic compute)")
+    cache_supported = True
+except Exception as e:
+    print(f"❌ Caching not supported: {type(e).__name__}")
+    print("✅ This is expected on serverless compute")
+    print("   ➡️ Serverless automatically manages memory optimization")
+    cache_supported = False
 
-# Repartitioning for better performance
-print("Original partitions:")
-print(f"Employees: {employees_df.rdd.getNumPartitions()}")
-print(f"Sales: {sales_df.rdd.getNumPartitions()}")
+# Repartitioning strategies (check RDD access first)
+try:
+    print("\nOriginal partitions:")
+    print(f"Employees: {employees_df.rdd.getNumPartitions()}")
+    print(f"Sales: {sales_df.rdd.getNumPartitions()}")
+    print("✅ Running on Classic compute - RDD operations available")
+except Exception as e:
+    print(f"\n❌ RDD access not available: {type(e).__name__}")
+    print("✅ Running on Serverless compute - RDD operations not supported")
+    print("   ➡️ Use DataFrame operations for optimal performance")
 
 # Repartition by key for joins
 employees_partitioned = employees_df.repartition("department")
@@ -873,6 +888,6 @@ transformation_pipeline.select(
 # MAGIC | **Broadcast** | `broadcast(small_df)` | Optimize small table joins |
 # MAGIC | **Array Functions** | `explode(col("array_col"))` | Work with arrays |
 # MAGIC | **Nested Access** | `col("struct.field")` | Access nested fields |
-# MAGIC | **Cache** | `.cache()` | Performance optimization |
+# MAGIC | **Cache** | `.cache()` | Performance (Classic only) |
 # MAGIC | **Repartition** | `.repartition("key")` | Optimize for joins |
 # MAGIC | **Complex Agg** | `.agg(sum(when(condition, value)))` | Conditional aggregation |

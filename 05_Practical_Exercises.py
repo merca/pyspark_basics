@@ -714,7 +714,15 @@ def performance_optimization_workshop():
         
         # Strategy 2: Using broadcast for small tables
         print("\nStrategy 2: Broadcast optimization")
-        products_df.cache()  # Cache reference data
+        
+        # Caching is NOT SUPPORTED on serverless compute
+        try:
+            products_df.cache()  # Cache reference data (Classic compute)
+            print("✅ Products DataFrame cached (Classic compute)")
+        except Exception as e:
+            print(f"❌ Caching not supported: {type(e).__name__}")
+            print("✅ This is expected on serverless compute")
+            print("   ➡️ Serverless automatically manages memory optimization")
         
         optimized_query = customers_df.join(
             orders_df.filter(col("status") == "Completed"), "customer_id"
@@ -750,15 +758,28 @@ def performance_optimization_workshop():
                     ), "customer_id", "left"
         )
         
-        # Cache this expensive computation
-        customer_summary.cache()
-        customer_summary.count()  # Trigger caching
-        
-        print("✅ Customer summary cached")
+        # Cache this expensive computation (Classic vs Serverless compatibility)
+        try:
+            customer_summary.cache()
+            customer_summary.count()  # Trigger caching
+            print("✅ Customer summary cached (Classic compute)")
+            cache_enabled = True
+        except Exception as e:
+            print(f"❌ Caching not supported: {type(e).__name__}")
+            print("✅ This is expected on serverless compute")
+            print("   ➡️ Serverless automatically manages memory optimization")
+            cache_enabled = False
         
         # Create partitioned version for better performance
         customer_summary_partitioned = customer_summary.repartition("city")
-        customer_summary_partitioned.cache()
+        if cache_enabled:
+            try:
+                customer_summary_partitioned.cache()
+                print("✅ Partitioned customer summary cached (Classic compute)")
+            except:
+                print("❌ Partitioned caching not supported (Serverless)")
+        else:
+            print("✅ Partitioned customer summary created (Serverless optimized)")
         
         print("✅ Partitioned customer summary cached")
         
@@ -804,9 +825,16 @@ def performance_optimization_workshop():
                 count("order_id").alias("daily_orders")
             )
         
-        # Cache daily aggregations  
-        daily_sales.cache()
-        daily_sales.count()
+        # Cache daily aggregations (Classic vs Serverless compatibility)
+        try:
+            daily_sales.cache()
+            daily_sales.count()
+            print("✅ Daily sales aggregations cached (Classic compute)")
+            daily_cached = True
+        except Exception as e:
+            print(f"❌ Daily sales caching not supported: {type(e).__name__}")
+            print("✅ This is expected on serverless compute")
+            daily_cached = False
         
         # Monthly aggregations (built from daily)
         monthly_sales = daily_sales.withColumn("month", date_format("order_date", "yyyy-MM")) \
@@ -816,7 +844,14 @@ def performance_optimization_workshop():
                 sum("daily_orders").alias("monthly_orders")
             )
         
-        monthly_sales.cache()
+        if daily_cached:
+            try:
+                monthly_sales.cache()
+                print("✅ Monthly sales aggregations cached (Classic compute)")
+            except:
+                print("❌ Monthly sales caching not supported (Serverless)")
+        else:
+            print("✅ Monthly sales aggregations created (Serverless optimized)")
         
         print("✅ Multi-level aggregations cached")
         monthly_sales.show()
@@ -1232,8 +1267,14 @@ def final_integration_challenge():
                 "lifetime_value": 0, "unique_products_bought": 0
             })
             
-            # Cache the result
-            customer_360.cache()
+            # Cache the result (Classic vs Serverless compatibility)
+            try:
+                customer_360.cache()
+                print("✅ Customer 360 view cached (Classic compute)")
+            except Exception as e:
+                print(f"❌ Customer 360 caching not supported: {type(e).__name__}")
+                print("✅ This is expected on serverless compute")
+                print("   ➡️ Serverless automatically optimizes query performance")
             
             return customer_360
         
