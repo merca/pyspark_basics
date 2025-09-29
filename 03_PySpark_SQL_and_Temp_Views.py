@@ -537,23 +537,46 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 10. Performance Tips for SQL Queries
+# MAGIC ## 10. Performance Tips for SQL Queries (Serverless-Compatible)
 
 # COMMAND ----------
 
-# Caching frequently used views
-employees_df.cache()
-employees_df.createOrReplaceTempView("cached_employees")
+# Caching is NOT SUPPORTED on serverless compute
+print("=== Caching and Performance ===")
+try:
+    # This works on Classic compute but fails on Serverless
+    employees_df.cache()
+    employees_df.createOrReplaceTempView("cached_employees")
+    print("✅ DataFrame cached and view created (Classic compute)")
+    
+    # Query with cached data
+    cached_query = spark.sql("""
+        SELECT department, AVG(salary) 
+        FROM cached_employees 
+        GROUP BY department
+    """)
+    query_table_name = "cached_employees"
+    
+except Exception as e:
+    print(f"❌ Caching not supported: {type(e).__name__}")
+    print("✅ This is expected on serverless compute")
+    print("   ➡️ On serverless, query optimization is handled automatically")
+    
+    # Use regular temp view instead
+    employees_df.createOrReplaceTempView("performance_employees")
+    cached_query = spark.sql("""
+        SELECT department, AVG(salary) 
+        FROM performance_employees 
+        GROUP BY department
+    """)
+    query_table_name = "performance_employees"
 
-print("✅ DataFrame cached and view created")
+# Show the results regardless of caching
+cached_query.show()
 
-# Using EXPLAIN to see query plans
-print("\n=== Query Execution Plan ===")
-spark.sql("""
-    SELECT department, AVG(salary) 
-    FROM cached_employees 
-    GROUP BY department
-""").explain(True)  # Set to True for detailed plan
+# Using EXPLAIN to see query plans (works on both Classic and Serverless)
+print(f"\n=== Query Execution Plan for {query_table_name} ===")
+cached_query.explain(True)  # Set to True for detailed plan
 
 # COMMAND ----------
 
