@@ -407,7 +407,7 @@ sales_pivot = sales_df.groupBy("quarter") \
     .pivot("category") \
     .agg(
         sum("amount").alias("total_sales"),
-        count("*").alias("transaction_count")
+        count(lit(1)).alias("transaction_count")  # Use count(lit(1)) instead of count("*") in pivot
     )
 
 sales_pivot.show()
