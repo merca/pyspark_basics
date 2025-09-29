@@ -174,21 +174,26 @@ salary_comparisons.show()
 print("=== Complex Join Conditions ===")
 
 # Join sales with products, but only for high-value sales
-high_value_sales = sales_df \
-    .join(products_df, "product_name") \
-    .join(employees_df, "employee_id") \
+# Use aliases to avoid ambiguous column references
+sales_alias = sales_df.alias("s")
+products_alias = products_df.alias("p") 
+employees_alias = employees_df.alias("e")
+
+high_value_sales = sales_alias \
+    .join(products_alias, col("s.product_name") == col("p.product_name")) \
+    .join(employees_alias, col("s.employee_id") == col("e.employee_id")) \
     .filter(
-        (col("amount") > col("list_price") * 0.8) &  # Sale amount > 80% of list price
-        (col("customer_rating") >= 4.5)              # High customer rating
+        (col("s.amount") > col("p.list_price") * 0.8) &  # Sale amount > 80% of list price
+        (col("s.customer_rating") >= 4.5)                # High customer rating
     ) \
     .select(
-        col("name").alias("salesperson"),
-        "product_name",
-        "category", 
-        "amount",
-        "list_price",
-        "customer_rating",
-        (col("amount") / col("list_price") * 100).alias("price_percentage")
+        col("e.name").alias("salesperson"),
+        col("p.product_name"),
+        col("p.category").alias("product_category"),  # Use product category to avoid ambiguity
+        col("s.amount"),
+        col("p.list_price"),
+        col("s.customer_rating"),
+        (col("s.amount") / col("p.list_price") * 100).alias("price_percentage")
     )
 
 high_value_sales.show()
