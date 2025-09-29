@@ -730,10 +730,12 @@ def calculate_employee_score(salary, revenue, rating, tenure_years):
     rating = rating or 0
     tenure_years = tenure_years or 0
     
-    revenue_score = min(revenue / 1000.0, 10.0)  # Max 10 points
-    salary_efficiency = min(revenue / salary * 10.0, 5.0)  # Max 5 points  
+    # Use Python's built-in min by avoiding the imported min function
+    import builtins
+    revenue_score = builtins.min(revenue / 1000.0, 10.0)  # Max 10 points
+    salary_efficiency = builtins.min(revenue / salary * 10.0, 5.0)  # Max 5 points  
     rating_score = rating  # Direct rating
-    tenure_bonus = min(tenure_years * 0.5, 2.0)  # Max 2 points for tenure
+    tenure_bonus = builtins.min(tenure_years * 0.5, 2.0)  # Max 2 points for tenure
     
     return float(revenue_score + salary_efficiency + rating_score + tenure_bonus)
 
