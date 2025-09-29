@@ -493,28 +493,46 @@ date_string_functions.show(truncate=False)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 9. Global vs Local Temporary Views
+# MAGIC ## 9. Global vs Local Temporary Views (Serverless-Compatible)
 
 # COMMAND ----------
 
 # Local temporary view (default) - only exists in current SparkSession
 employees_df.createOrReplaceTempView("local_employees")
 
-# Global temporary view - can be accessed across SparkSessions (in same application)
-employees_df.createGlobalTempView("global_employees")
-
-print("✅ Views created:")
+print("✅ Local temporary view created:")
 print("- local_employees (local temp view)")
-print("- global_employees (global temp view)")
 
-# Access global temp view (note the global_temp database prefix)
-print("\n=== Accessing global temp view ===")
-global_query = spark.sql("""
-    SELECT department, COUNT(*) as count
-    FROM global_temp.global_employees  
-    GROUP BY department
-""")
-global_query.show()
+# Global temporary views - NOT SUPPORTED on serverless compute
+print("\n=== Global Temporary Views ===")
+try:
+    # This will work on Classic compute but fail on Serverless
+    employees_df.createGlobalTempView("global_employees")
+    print("✅ Global temporary view created: global_employees")
+    
+    # Access global temp view (note the global_temp database prefix)
+    print("\n=== Accessing global temp view ===")
+    global_query = spark.sql("""
+        SELECT department, COUNT(*) as count
+        FROM global_temp.global_employees  
+        GROUP BY department
+    """)
+    global_query.show()
+    
+except Exception as e:
+    print(f"❌ Global temporary views not supported: {type(e).__name__}")
+    print("✅ This is expected on serverless compute")
+    print("   ➡️ Use local temporary views instead:")
+    
+    # Alternative: Use local temp views with descriptive names
+    employees_df.createOrReplaceTempView("shared_employees_view")
+    alternative_query = spark.sql("""
+        SELECT department, COUNT(*) as count
+        FROM shared_employees_view
+        GROUP BY department
+    """)
+    print("\nUsing local temporary view instead:")
+    alternative_query.show()
 
 # COMMAND ----------
 
@@ -806,7 +824,8 @@ bi_report.show()
 # MAGIC - Temporary views let you use SQL on any DataFrame
 # MAGIC - You can seamlessly mix SQL and DataFrame operations
 # MAGIC - SQL in PySpark supports most standard SQL features
-# MAGIC - Global temp views persist across SparkSessions
+# MAGIC - **Serverless**: Global temp views not supported, use local temp views
+# MAGIC - **Classic**: Global temp views persist across SparkSessions
 # MAGIC - Use EXPLAIN to understand query performance
 # MAGIC - Cache frequently used views for better performance
 # MAGIC 
@@ -820,7 +839,7 @@ bi_report.show()
 # MAGIC | Operation | Code Example | Description |
 # MAGIC |-----------|--------------|-------------|
 # MAGIC | **Create View** | `df.createOrReplaceTempView("table")` | Create temporary view |
-# MAGIC | **Global View** | `df.createGlobalTempView("table")` | Create global temp view |
+# MAGIC | **Global View** | `df.createGlobalTempView("table")` | Create global temp view (Classic only) |
 # MAGIC | **Run SQL** | `spark.sql("SELECT * FROM table")` | Execute SQL query |
 # MAGIC | **List Views** | `spark.catalog.listTables()` | Show all temp views |
 # MAGIC | **Drop View** | `spark.catalog.dropTempView("table")` | Remove temp view |
