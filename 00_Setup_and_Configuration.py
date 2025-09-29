@@ -5,9 +5,9 @@
 # MAGIC Welcome to Python and PySpark fundamentals for Data Engineers and Analysts!
 # MAGIC 
 # MAGIC This notebook covers:
-# MAGIC - Understanding the Databricks environment
+# MAGIC - Understanding the Databricks environment (Classic & Serverless)
 # MAGIC - SparkSession basics
-# MAGIC - Configuration and best practices
+# MAGIC - Serverless compute considerations
 # MAGIC - Environment setup for the course
 
 # COMMAND ----------
@@ -17,9 +17,13 @@
 # MAGIC 
 # MAGIC In Databricks, several things are pre-configured for you:
 # MAGIC - **SparkSession** is already available as `spark`
-# MAGIC - **SparkContext** is available as `sc`
+# MAGIC - **SparkContext** is available as `sc` (Classic clusters only)
 # MAGIC - Common libraries are pre-installed
 # MAGIC - Cluster resources are managed automatically
+# MAGIC 
+# MAGIC ### Serverless vs Classic Compute:
+# MAGIC - **Serverless**: Managed, auto-scaling, limited configuration access, no RDD operations
+# MAGIC - **Classic**: Full control, custom configurations, RDD support, manual scaling
 
 # COMMAND ----------
 
@@ -31,9 +35,15 @@ print(sys.version)
 print("\nSpark version:")
 print(spark.version)
 
-print("\nSpark configuration (first 10 items):")
-for conf in list(spark.sparkContext.getConf().getAll())[:10]:
-    print(f"{conf[0]}: {conf[1]}")
+# Check if we're on serverless (limited configuration access)
+try:
+    print("\nSpark configuration (first 10 items):")
+    # This may not work on serverless compute
+    for conf in list(spark.sparkContext.getConf().getAll())[:10]:
+        print(f"{conf[0]}: {conf[1]}")
+except Exception as e:
+    print(f"\nConfiguration access limited (likely serverless): {type(e).__name__}")
+    print("✅ This is expected on serverless compute - configurations are managed automatically")
 
 # COMMAND ----------
 
@@ -50,8 +60,14 @@ for conf in list(spark.sparkContext.getConf().getAll())[:10]:
 
 # The spark variable is your SparkSession
 print(f"SparkSession: {spark}")
-print(f"Application Name: {spark.sparkContext.appName}")
-print(f"Master: {spark.sparkContext.master}")
+
+# These may be limited on serverless compute
+try:
+    print(f"Application Name: {spark.sparkContext.appName}")
+    print(f"Master: {spark.sparkContext.master}")
+except Exception as e:
+    print(f"SparkContext access limited (serverless): {type(e).__name__}")
+    print("✅ This is expected on serverless - Spark context is managed automatically")
 
 # You can also create your own SparkSession (usually not needed in Databricks)
 from pyspark.sql import SparkSession
@@ -253,6 +269,12 @@ for check in checks:
 # MAGIC 3. **Immutability** - DataFrames don't change; operations create new DataFrames
 # MAGIC 4. **Use SQL when comfortable** - you can always fall back to `spark.sql()`
 # MAGIC 5. **Chain operations** - like building a complex query with CTEs
+# MAGIC 
+# MAGIC ### Serverless-Specific Best Practices:
+# MAGIC 
+# MAGIC 6. **Avoid RDD operations** - Use DataFrame/SQL APIs instead
+# MAGIC 7. **Use mapInPandas/mapInArrow** - For custom operations instead of RDD transformations
+# MAGIC 8. **Focus on DataFrame operations** - Configuration tuning is handled automatically
 
 # COMMAND ----------
 
@@ -285,51 +307,103 @@ new_df.select("name", "salary", "salary_category").show()
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 9. Common Configuration Settings
+# MAGIC ### Serverless-Compatible Custom Operations
 # MAGIC 
-# MAGIC Here are some useful Spark configurations:
+# MAGIC Instead of RDD operations, use mapInPandas for custom transformations:
 
 # COMMAND ----------
 
-# View current important configurations
-important_configs = [
-    "spark.sql.adaptive.enabled",
-    "spark.sql.adaptive.coalescePartitions.enabled",
-    "spark.sql.adaptive.skewJoin.enabled",
-    "spark.serializer"
-]
+# Example: Custom salary calculation using mapInPandas (serverless-compatible)
+def calculate_bonus(pdf):
+    """Custom function using Pandas - works on serverless"""
+    pdf['bonus'] = pdf['salary'] * 0.10  # 10% bonus
+    pdf['total_compensation'] = pdf['salary'] + pdf['bonus']
+    return pdf
 
-print("Current Spark Configuration:")
-for config in important_configs:
-    try:
-        value = spark.conf.get(config)
-        print(f"{config}: {value}")
-    except:
-        print(f"{config}: Not set")
+# Apply custom function using mapInPandas (serverless-compatible)
+from pyspark.sql.functions import pandas_udf
+from pyspark.sql.types import StructType, StructField, IntegerType, StringType, DateType, DoubleType
+
+# Define return schema
+bonus_schema = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("name", StringType(), True),
+    StructField("department", StringType(), True),
+    StructField("position", StringType(), True),
+    StructField("salary", IntegerType(), True),
+    StructField("hire_date", DateType(), True),
+    StructField("bonus", DoubleType(), True),
+    StructField("total_compensation", DoubleType(), True)
+])
+
+employees_with_bonus = employees_df.mapInPandas(calculate_bonus, schema=bonus_schema)
+employees_with_bonus.select("name", "salary", "bonus", "total_compensation").show()
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 10. Memory and Performance Tips
+# MAGIC ## 9. Configuration Settings (Classic vs Serverless)
 # MAGIC 
-# MAGIC ### Key concepts for performance:
-# MAGIC - **Partitions**: How your data is divided across the cluster
-# MAGIC - **Caching**: Storing frequently used data in memory
-# MAGIC - **Broadcast**: Sending small tables to all nodes
+# MAGIC **Serverless**: Configurations are managed automatically, limited access
+# MAGIC 
+# MAGIC **Classic**: Full configuration control available
 
 # COMMAND ----------
 
-# Check DataFrame partitions
-print(f"Employees DataFrame partitions: {employees_df.rdd.getNumPartitions()}")
-print(f"Sales DataFrame partitions: {sales_df.rdd.getNumPartitions()}")
+# View current important configurations (when available)
+important_configs = [
+    "spark.sql.adaptive.enabled",
+    "spark.sql.adaptive.coalescePartitions.enabled", 
+    "spark.sql.adaptive.skewJoin.enabled",
+    "spark.serializer"
+]
 
-# Cache a DataFrame if you'll use it multiple times
+print("Spark Configuration Access:")
+try:
+    for config in important_configs:
+        try:
+            value = spark.conf.get(config)
+            print(f"{config}: {value}")
+        except:
+            print(f"{config}: Not accessible")
+except Exception as e:
+    print(f"Configuration access limited: {type(e).__name__}")
+    print("✅ On serverless, configurations are optimized automatically")
+    print("   ➡️ Focus on DataFrame/SQL operations instead of low-level tuning")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 10. Performance Tips (Serverless-Compatible)
+# MAGIC 
+# MAGIC ### Key concepts for performance:
+# MAGIC - **Caching**: Storing frequently used data in memory
+# MAGIC - **DataFrame Operations**: Use DataFrame/SQL instead of RDDs on serverless
+# MAGIC - **Lazy Evaluation**: Operations are optimized before execution
+
+# COMMAND ----------
+
+# Check if we can access partition information (Classic compute)
+try:
+    print(f"Employees DataFrame partitions: {employees_df.rdd.getNumPartitions()}")
+    print(f"Sales DataFrame partitions: {sales_df.rdd.getNumPartitions()}")
+    print("✅ Running on Classic compute - RDD access available")
+except Exception as e:
+    print(f"RDD access not available: {type(e).__name__}")
+    print("✅ Running on Serverless compute - RDD operations not supported")
+    print("   ➡️ Use DataFrame operations and SQL for optimal performance")
+
+# Caching works on both Classic and Serverless
 employees_df.cache()
-print("✅ Employees DataFrame cached")
+print("\n✅ Employees DataFrame cached (works on both Classic and Serverless)")
 
 # Force the cache by triggering an action
 count = employees_df.count()
 print(f"Cached DataFrame count: {count}")
+
+# Alternative ways to check DataFrame structure (serverless-compatible)
+print(f"\nDataFrame schema columns: {len(employees_df.columns)}")
+print(f"DataFrame estimated size: {employees_df.count()} rows")
 
 # COMMAND ----------
 
@@ -337,13 +411,16 @@ print(f"Cached DataFrame count: {count}")
 # MAGIC ## Summary
 # MAGIC 
 # MAGIC You now have:
-# MAGIC - ✅ Understanding of the Databricks environment
+# MAGIC - ✅ Understanding of the Databricks environment (Classic & Serverless)
 # MAGIC - ✅ Sample datasets loaded (`employees_df`, `sales_df`)
 # MAGIC - ✅ Temporary views created (`employees`, `sales`)
-# MAGIC - ✅ Basic configuration knowledge
-# MAGIC - ✅ Performance tips and best practices
+# MAGIC - ✅ Serverless-compatible operations and best practices
+# MAGIC - ✅ Performance tips for both compute types
+# MAGIC - ✅ Custom operations using mapInPandas (serverless-friendly)
 # MAGIC 
 # MAGIC **Next Steps**: Move on to the Python Basics notebook to learn Python fundamentals with a SQL perspective!
+# MAGIC 
+# MAGIC **Remember**: This notebook works on both Classic and Serverless compute, with automatic fallbacks for unsupported operations.
 
 # COMMAND ----------
 
