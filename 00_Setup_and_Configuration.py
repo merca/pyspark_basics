@@ -224,7 +224,7 @@ except:
 
 try:
     # Check SQL operations
-    result = spark.sql("SELECT COUNT(*) as count FROM employees").collect()[0].count
+    result = spark.sql("SELECT COUNT(*) as count FROM employees").collect()[0]["count"]
     assert result == 10
     checks.append(f"✅ SQL operations working ({result} records)")
 except:
